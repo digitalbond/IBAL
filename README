@@ -1,0 +1,22 @@
+IBAL is the IDA Pro Bootrom Analysis Library, which contains a number of useful functions for analyzing embedded ROMs.
+
+The inspiration for this project was Halvar Flake's x86_re_lib.  This attempts to implement that functionality in a processor-agnostic manner.
+
+Some of the problems that this library tackles:
+- Indirect (register target) jumping
+- Compiler goofiness such as not using typical function instructions
+- Identifying functions used by multiple code islands (interrupt handlers and other unique entry points)
+
+I hope that you find it useful.  For bugfixes and additions please hit me on github or freenode (giminy in both places) or on twitter, @ReverseICS.
+
+Some simple tricks to get you started:
+
+- Locate an interesting start piece of code (such as the root of an HTTP server)
+- Note the start address, or use ScreenEA(), then:
+
+>>> myBA = binanalyze.BinAnalyze()
+>>> interestingEas = myBA.findAccessibleCode(ea)
+
+Now interestingEas contains an array of reachable code.  You may filter this
+list using arch-specific searches.  For example, find all signed comparisons in
+this list.
