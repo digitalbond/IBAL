@@ -1,6 +1,6 @@
 IBAL is the IDA Pro Bootrom Analysis Library, which contains a number of useful functions for analyzing embedded ROMs.
 
-The inspiration for this project was Halvar Flake's x86_re_lib.  This attempts to implement that functionality in a processor-agnostic manner.
+The inspiration for this project was Halvar Flake's x86_re_lib.  This attempts to implement that functionality in a processor-agnostic manner, and introduce some new concepts in tracking down accessible code.
 
 Some of the problems that this library tackles:
 - Indirect (register target) jumping
@@ -8,6 +8,39 @@ Some of the problems that this library tackles:
 - Identifying functions used by multiple code islands (interrupt handlers and other unique entry points)
 
 I hope that you find it useful.  For bugfixes and additions please hit me on github or freenode (giminy in both places) or on twitter, @ReverseICS.
+
+To install, copy all of the files in this project into your IDA python directory (on Windows, typically C:\Program Files\IDA\python\).
+
+Then, load the library into IDA by placing your cursor in the Python entry box at the bottom of the IDA window.  Type:
+
+import binanalyze # for non-arm CPUs
+import armanalyze # for arm cpus
+
+Now you can instantiate a binanalyze object:
+
+myBA = binanalyze.BinAnalyze()
+or
+myBA = armanalyze.ArmAnalyze()
+
+Now you may start using the functionality.
+
+Many of the functions available are meant for internal or advanced usage.  Some items of interest:
+
+myBA.getXXXMnems()
+
+This group of methods will return instruction mnemonics that match a particular category.  For example, myBA.getSignedMnems() will return a list of all 'signed' instruction mnemonics for ARM cpus.  This list can be used to filter instructions.  Other mnemonic categories include 'Call' (for function calls), 'Branch' (for branch/jump instructions), 'Assign' (for instructions whose purpose is to assign data to an address or register), 'Cmp' (for comparison instructions), 'SignExtend' (for instructions which sign-extend bytes, shorts, etc into shorts, ints, longs, etc, preserving the sign bit), as well as comparison search such 'Signed', 'Unsigned', 'Zero', 'NotZero'.  
+
+myBA.makeFuncsFromPreamble(funcpreamble, startea=idc.FirstSeg(), endea = idaapi.BADADDR)
+
+This function makes functions from a fixed series of bytes. This can be useful for analyzing firmware images where the loading address or code entrypoint is not known, or where the firmware makes such heavy use of indirect jumps that IDA's autoanalysis fails.
+
+For example on x86 architectures, functions often start with PUSH ebp (55 8b in hexadecimal).  Running myBA.makeFuncsFromPreamble("55 8b") on one of these binaries will locate each occurence of the byte sequence 55 8b and issue an IDA 'makeFunction' call on the sequence.  Note that this can be dangerous, because you may end up creating code where none should exist.
+
+myBA.findAccessibleEas(startea):
+
+This function will follow IDA's internal data structures to find all code that may be reached from a given entrypoint.  It returns an array of instruction addresses.  Each address will correspond to an instruction, which you may use in filtering to find instructions that are interesting to your research.
+
+Note that if your disassembly makes heavy use of function pointers with math, this may not behave quite right.  Psuedo-emulation will be required for that part.
 
 Some simple tricks to get you started:
 
@@ -20,3 +53,14 @@ Some simple tricks to get you started:
 Now interestingEas contains an array of reachable code.  You may filter this
 list using arch-specific searches.  For example, find all signed comparisons in
 this list.
+
+>>> reallyInterestingEas = filterEasbyMnems(interestingEas, myBA.getSignedMnems())
+
+Now reallyInterestingEas contains the addresses of all signed instructions that are accessible in your protocol parser (most simple protocol parsers should not be performing signed comparisons or any other signed instructions, so these instructions are likely to represent bugs).  We can now print out the instruction list in a way that lets us double-click on the address to jump to the code offset:
+
+>>> for ea in reallyInterestingEas:
+  print hex(ea),
+
+We now get a list of hex addresses.  Double-click the address to see what the code is doing.
+
+Happy Hunting!
